@@ -1,0 +1,26 @@
+# Serveur web et API
+Flask==2.3.3
+Flask-Cors==4.0.0
+Werkzeug==2.3.7
+gunicorn==21.2.0
+
+# Utilitaires et outils
+requests==2.31.0
+python-dotenv==1.0.0
+websocket-client==1.6.3
+pyzmq==25.1.1
+pydantic==2.3.0
+
+# Manipulations de données
+numpy==1.24.4
+pandas==2.1.0
+pillow==10.0.1
+python-dateutil==2.8.2
+
+# Logging et monitoring
+structlog==23.1.0
+rich==13.5.2
+
+# Tests
+pytest==7.4.1
+pytest-cov==4.1.0

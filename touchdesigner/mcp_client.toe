@@ -1,0 +1,214 @@
+import socket
+import json
+import threading
+import traceback
+
+class MCPServer:
+    def __init__(self, port=7001):
+        self.port = port
+        self.running = False
+        self.server_socket = None
+        self.thread = None
+    
+    def start(self):
+        """Démarrer le serveur"""
+        if self.running:
+            return False
+        
+        try:
+            self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            self.server_socket.bind(('0.0.0.0', self.port))
+            self.server_socket.listen(5)
+            
+            self.running = True
+            self.thread = threading.Thread(target=self._run_server)
+            self.thread.daemon = True
+            self.thread.start()
+            
+            print(f"MCP Server started on port {self.port}")
+            return True
+        
+        except Exception as e:
+            print(f"Error starting MCP server: {str(e)}")
+            return False
+    
+    def stop(self):
+        """Arrêter le serveur"""
+        self.running = False
+        if self.server_socket:
+            self.server_socket.close()
+        print("MCP Server stopped")
+    
+    def _run_server(self):
+        """Boucle principale du serveur"""
+        while self.running:
+            try:
+                client_socket, address = self.server_socket.accept()
+                print(f"Connection from {address}")
+                
+                client_handler = threading.Thread(
+                    target=self._handle_client,
+                    args=(client_socket,)
+                )
+                client_handler.daemon = True
+                client_handler.start()
+            
+            except Exception as e:
+                if self.running:  # Ignorer les erreurs lors de l'arrêt
+                    print(f"Server error: {str(e)}")
+    
+    def _handle_client(self, client_socket):
+        """Gérer une connexion client"""
+        try:
+            buffer = ""
+            while self.running:
+                data = client_socket.recv(4096)
+                if not data:
+                    break
+                
+                buffer += data.decode('utf-8')
+                
+                # Traitement des commandes complètes (séparées par \n)
+                while '\n' in buffer:
+                    command_str, buffer = buffer.split('\n', 1)
+                    
+                    # Traiter la commande
+                    result = self._process_command(command_str)
+                    
+                    # Envoyer la réponse
+                    response = json.dumps(result) + "\n"
+                    client_socket.sendall(response.encode('utf-8'))
+        
+        except Exception as e:
+            print(f"Client handling error: {str(e)}")
+            traceback.print_exc()
+        
+        finally:
+            client_socket.close()
+    
+    def _process_command(self, command_str):
+        """Traiter une commande JSON"""
+        try:
+            command = json.loads(command_str)
+            
+            action = command.get('action')
+            
+            if action == 'execute_tool':
+                tool_name = command.get('tool_name')
+                parameters = command.get('parameters', {})
+                
+                if tool_name == 'create_operator':
+                    return self._create_operator(parameters)
+                
+                elif tool_name == 'delete_operator':
+                    return self._delete_operator(parameters)
+                
+                elif tool_name == 'connect_operators':
+                    return self._connect_operators(parameters)
+                
+                # Ajouter d'autres outils ici...
+                
+                else:
+                    return {"error": f"Unknown tool: {tool_name}"}
+            
+            else:
+                return {"error": f"Unknown action: {action}"}
+        
+        except json.JSONDecodeError:
+            return {"error": "Invalid JSON"}
+        
+        except Exception as e:
+            return {"error": str(e)}
+    
+    def _create_operator(self, params):
+        """Créer un opérateur"""
+        try:
+            op_type = params.get('operator_type')
+            name = params.get('name', f"new_{op_type}")
+            parent_path = params.get('parent_path', '/')
+            position = params.get('position', {"x": 0, "y": 0})
+            
+            # Obtenir le parent
+            parent = op(parent_path)
+            if not parent:
+                return {"error": f"Parent not found: {parent_path}"}
+            
+            # Créer l'opérateur
+            new_op = parent.create(op_type, name)
+            
+            # Positionner l'opérateur
+            new_op.nodeX = position.get('x', 0)
+            new_op.nodeY = position.get('y', 0)
+            
+            return {
+                "success": True,
+                "message": f"Created {op_type} operator: {name}",
+                "path": new_op.path
+            }
+        
+        except Exception as e:
+            return {"error": str(e)}
+    
+    def _delete_operator(self, params):
+        """Supprimer un opérateur"""
+        try:
+            op_path = params.get('operator_path')
+            operator = op(op_path)
+            
+            if not operator:
+                return {"error": f"Operator not found: {op_path}"}
+            
+            # Supprimer l'opérateur
+            operator.destroy()
+            
+            return {
+                "success": True,
+                "message": f"Deleted operator: {op_path}"
+            }
+        
+        except Exception as e:
+            return {"error": str(e)}
+    
+    def _connect_operators(self, params):
+        """Connecter deux opérateurs"""
+        try:
+            source_path = params.get('source_path')
+            destination_path = params.get('destination_path')
+            output_index = params.get('output_index', 0)
+            input_index = params.get('input_index', 0)
+            
+            source = op(source_path)
+            destination = op(destination_path)
+            
+            if not source:
+                return {"error": f"Source operator not found: {source_path}"}
+            
+            if not destination:
+                return {"error": f"Destination operator not found: {destination_path}"}
+            
+            # Connecter les opérateurs
+            destination.inputConnectors[input_index].connect(source, output_index)
+            
+            return {
+                "success": True,
+                "message": f"Connected {source_path} to {destination_path}"
+            }
+        
+        except Exception as e:
+            return {"error": str(e)}
+
+# Instance globale du serveur
+server = None
+
+def onStart():
+    """Fonction appelée au démarrage"""
+    global server
+    server = MCPServer(port=7001)
+    server.start()
+
+def onExit():
+    """Fonction appelée à la fermeture"""
+    global server
+    if server:
+        server.stop()
