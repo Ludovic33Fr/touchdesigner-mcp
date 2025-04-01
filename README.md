@@ -1,0 +1,16 @@
+# Structure
+
+touchdesigner-mcp/
+│
+├── server/
+│   ├── server.py               # Serveur Flask principal
+│   ├── td_connector.py         # Module de communication avec TouchDesigner
+│   ├── tools/                  # Définitions des outils
+│   │   ├── __init__.py
+│   │   ├── operator_tools.py   # Outils pour manipuler les opérateurs
+│   │   ├── parameter_tools.py  # Outils pour manipuler les paramètres
+│   │   └── project_tools.py    # Outils pour gérer les projets
+│   └── requirements.txt        # Dépendances Python
+│
+└── touchdesigner/
+    └── mcp_client.toe          # Projet TouchDesigner avec client MCP
