@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "touchdesigner": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "C:\\Repo\\touchdesigner-mcp\\touchdesigner-mcp-server",
+        "run",
+        "touchdesigner_control_server.py"
+      ]
+    }
+  }
+}
